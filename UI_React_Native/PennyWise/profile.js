@@ -71,7 +71,7 @@ const ProfilePage = () => {
               <View style={styles.qrCodeContainer}>
                 <View style={styles.qrCodeImageContainer}>
                   <Image 
-                    source={{ uri: 'UI_React_Native/PennyWise/orderbook.png' }} 
+                    source={{ uri: 'https://via.placeholder.com/200' }} 
                     style={styles.qrCodeImage}
                   />
                 </View>

@@ -12,11 +12,11 @@ import {
 // Mock data - in a real app, this would come from your backend/state management
 const userData = {
   name: 'Alex',
-  totalSaved: 7850,
+  totalSaved: 785,
   goals: [
-    { name: 'Vacation', target: 5000, saved: 3500 },
-    { name: 'New Laptop', target: 2000, saved: 1200 },
-    { name: 'Emergency Fund', target: 10000, saved: 3150 },
+    { name: 'Vacation', target: 5000, saved: 785 },
+    { name: 'New Earphones', target: 2000, saved: 785 },
+    { name: 'Computer Mouse', target: 500, saved: 785 },
   ],
 };
 
@@ -53,7 +53,7 @@ const HomePage = () => {
         {/* Total savings card */}
         <View style={styles.savingsCard}>
           <Text style={styles.savingsLabel}>Total Money Saved</Text>
-          <Text style={styles.savingsAmount}>{userData.totalSaved.toLocaleString()}</Text>
+          <Text style={styles.savingsAmount}>₹{userData.totalSaved.toLocaleString()}</Text>
         </View>
 
         {/* Top 3 goals with progress bars */}

@@ -12,16 +12,16 @@ import Icon from 'react-native-vector-icons/Feather'; // Changed from Ionicons t
 
 // Mock data - in a real app, this would come from your backend/state management
 const userData = {
-  totalSaved: 7850,
+  totalSaved: 785,
   individualGoals: [
-    { id: '1', name: 'Vacation', target: 5000, saved: 7850, dueDate: '2025-07-15' },
-    { id: '2', name: 'New Laptop', target: 2000, saved: 7850, dueDate: '2025-05-20' },
-    { id: '3', name: 'Emergency Fund', target: 10000, saved: 7850, dueDate: '2025-12-31' },
-    { id: '4', name: 'New Phone', target: 1000, saved: 7850, dueDate: '2025-04-10' },
+    { id: '1', name: 'Vacation', target: 5000, saved: 785, dueDate: '2025-07-15' },
+    { id: '2', name: 'New Earphones', target: 2000, saved: 785, dueDate: '2025-05-20' },
+    { id: '3', name: 'Computer Mouse', target: 500, saved: 785, dueDate: '2025-12-31' },
+    { id: '4', name: 'New Watch', target: 4000, saved: 785, dueDate: '2025-04-10' },
   ],
   collaborativeGoals: [
-    { id: '5', name: 'Trip with Friends', target: 8000, saved: 4200, dueDate: '2025-08-30', members: 4 },
-    { id: '6', name: 'Group Gift', target: 1500, saved: 900, dueDate: '2025-03-15', members: 5 },
+    { id: '5', name: 'Trip with Friends', target: 8000, saved: 420, dueDate: '2025-08-30', members: 4 },
+    { id: '6', name: 'Group Gift', target: 1500, saved: 255, dueDate: '2025-03-15', members: 5 },
   ],
 };
 
