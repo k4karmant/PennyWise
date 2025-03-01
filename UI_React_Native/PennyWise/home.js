@@ -13,22 +13,20 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSavings } from './SavingsContext'; // Import the useSavings hook
 
-// Mock data - in a real app, this would come from your backend/state management
-const initialUserData = {
-  name: 'Alex',
-  totalSaved: 785,
-  goals: [
-    { name: 'Vacation', target: 5000, saved: 785 },
-    { name: 'New Earphones', target: 2000, saved: 785 },
-    { name: 'Computer Mouse', target: 500, saved: 785 },
-  ],
+// Priority colors
+const priorityColors = {
+  High: '#e03131',
+  Medium: '#f59f00',
+  Low: '#40c057',
 };
 
 const HomePage = () => {
-  const [userData, setUserData] = useState(initialUserData);
+  const { userData, updateUserData, totalSaved } = useSavings();
   const [manualTransferVisible, setManualTransferVisible] = useState(false);
   const [transferAmount, setTransferAmount] = useState('');
+  const [selectedGoalId, setSelectedGoalId] = useState(null);
 
   // Calculate percentage for progress bars
   const calculatePercentage = (saved, target) => {
@@ -36,8 +34,18 @@ const HomePage = () => {
     return percentage > 100 ? 100 : percentage;
   };
 
+  // Filter goals to only show individual goals
+  const individualGoals = userData.goals.filter(goal => goal.isIndividual);
+
   // Open manual transfer modal
   const openManualTransfer = () => {
+    setManualTransferVisible(true);
+    setSelectedGoalId(null); // Reset selected goal
+  };
+
+  // Open manual transfer modal for a specific goal
+  const openGoalTransfer = (goalId) => {
+    setSelectedGoalId(goalId);
     setManualTransferVisible(true);
   };
 
@@ -51,22 +59,59 @@ const HomePage = () => {
     }
 
     // Update user data
-    const updatedGoals = userData.goals.map(goal => ({
-      ...goal,
-      saved: goal.saved + amount
-    }));
+    let updatedGoals;
+    
+    if (selectedGoalId) {
+      // Add to specific goal
+      updatedGoals = userData.goals.map(goal => {
+        if (goal.id === selectedGoalId) {
+          return {
+            ...goal,
+            saved: goal.saved + amount
+          };
+        }
+        return goal;
+      });
+      
+      Alert.alert('Success', `₹${amount} added to ${userData.goals.find(g => g.id === selectedGoalId).name}!`);
+    } else {
+      // Add to all individual goals proportionally based on priority
+      const priorities = {
+        'High': 3,
+        'Medium': 2,
+        'Low': 1
+      };
+      
+      // Only consider individual goals for automatic distribution
+      const relevantGoals = userData.goals.filter(goal => goal.isIndividual);
+      const totalPriorityPoints = relevantGoals.reduce((sum, goal) => sum + priorities[goal.priority], 0);
+      
+      updatedGoals = userData.goals.map(goal => {
+        // Only distribute to individual goals
+        if (goal.isIndividual) {
+          const priorityWeight = priorities[goal.priority] / totalPriorityPoints;
+          const goalAmount = Math.round(amount * priorityWeight);
+          
+          return {
+            ...goal,
+            saved: goal.saved + goalAmount
+          };
+        }
+        return goal;
+      });
+      
+      Alert.alert('Success', `₹${amount} distributed across your individual goals based on priority!`);
+    }
 
-    setUserData({
+    // Update userData with new goals
+    updateUserData({
       ...userData,
-      totalSaved: userData.totalSaved + amount,
       goals: updatedGoals
     });
 
     // Reset and close the modal
     setTransferAmount('');
     setManualTransferVisible(false);
-    
-    Alert.alert('Success', `₹${amount} added to your savings!`);
   };
 
   return (
@@ -87,22 +132,31 @@ const HomePage = () => {
         {/* Total savings card */}
         <View style={styles.savingsCard}>
           <Text style={styles.savingsLabel}>Total Money Saved</Text>
-          <Text style={styles.savingsAmount}>₹{userData.totalSaved.toLocaleString()}</Text>
+          <Text style={styles.savingsAmount}>₹{totalSaved.toLocaleString()}</Text>
         </View>
 
-        {/* Top 3 goals with progress bars */}
+        {/* Goals with progress bars */}
         <View style={styles.goalSection}>
-          <Text style={styles.sectionTitle}>Your Top Goals</Text>
+          <Text style={styles.sectionTitle}>Your Individual Goals</Text>
           
-          {userData.goals.map((goal, index) => {
+          {individualGoals.map((goal, index) => {
             const percentage = calculatePercentage(goal.saved, goal.target);
             
             return (
-              <View key={index} style={styles.goalItem}>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.goalItem}
+                onPress={() => openGoalTransfer(goal.id)}
+              >
                 <View style={styles.goalHeader}>
-                  <Text style={styles.goalName}>{goal.name}</Text>
+                  <View style={styles.goalNameContainer}>
+                    <Text style={styles.goalName}>{goal.name}</Text>
+                    <View style={[styles.priorityBadge, { backgroundColor: priorityColors[goal.priority] }]}>
+                      <Text style={styles.priorityText}>{goal.priority}</Text>
+                    </View>
+                  </View>
                   <Text style={styles.goalAmount}>
-                  ₹{goal.saved.toLocaleString()} / ₹{goal.target.toLocaleString()}
+                    ₹{goal.saved.toLocaleString()} / ₹{goal.target.toLocaleString()}
                   </Text>
                 </View>
                 
@@ -110,16 +164,16 @@ const HomePage = () => {
                   <View 
                     style={[
                       styles.progressFill, 
-                      { width: `${percentage}%` },
-                      index === 0 ? { backgroundColor: '#4c6ef5' } :
-                      index === 1 ? { backgroundColor: '#40c057' } :
-                                    { backgroundColor: '#fd7e14' }
+                      { width: `${percentage}%`, backgroundColor: priorityColors[goal.priority] }
                     ]} 
                   />
                 </View>
                 
-                <Text style={styles.percentageText}>{Math.round(percentage)}% complete</Text>
-              </View>
+                <View style={styles.goalFooter}>
+                  <Text style={styles.percentageText}>{Math.round(percentage)}% complete</Text>
+                  <Text style={styles.tapToAddText}>Tap to add money</Text>
+                </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -184,7 +238,17 @@ const HomePage = () => {
           style={styles.modalContainer}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Money</Text>
+            <Text style={styles.modalTitle}>
+              {selectedGoalId 
+                ? `Add Money to: ${userData.goals.find(g => g.id === selectedGoalId)?.name}` 
+                : 'Add Money to All Individual Goals'}
+            </Text>
+            
+            {selectedGoalId && (
+              <Text style={styles.modalSubtitle}>
+                Priority: {userData.goals.find(g => g.id === selectedGoalId)?.priority}
+              </Text>
+            )}
             
             <Text style={styles.modalLabel}>Enter Amount (₹)</Text>
             <TextInput
@@ -195,6 +259,12 @@ const HomePage = () => {
               keyboardType="number-pad"
               autoFocus={true}
             />
+            
+            {!selectedGoalId && (
+              <Text style={styles.distributionNote}>
+                Money will be distributed based on goal priorities
+              </Text>
+            )}
             
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -286,16 +356,37 @@ const styles = StyleSheet.create({
   },
   goalItem: {
     marginBottom: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   goalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
+  goalNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   goalName: {
     fontSize: 16,
     fontWeight: '500',
     color: '#343a40',
+    marginRight: 8,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  priorityText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   goalAmount: {
     fontSize: 16,
@@ -306,16 +397,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#e9ecef',
     borderRadius: 6,
     overflow: 'hidden',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     borderRadius: 6,
   },
+  goalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   percentageText: {
     fontSize: 14,
     color: '#6c757d',
-    textAlign: 'right',
+  },
+  tapToAddText: {
+    fontSize: 14,
+    color: '#4c6ef5',
+    fontStyle: 'italic',
   },
   paymentSection: {
     marginBottom: 24,
@@ -381,7 +480,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#212529',
-    marginBottom: 20,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#6c757d',
+    marginBottom: 16,
   },
   modalLabel: {
     fontSize: 16,
@@ -397,7 +502,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 18,
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  distributionNote: {
+    fontSize: 14,
+    color: '#6c757d',
+    fontStyle: 'italic',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',

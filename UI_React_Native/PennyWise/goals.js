@@ -7,27 +7,22 @@ import {
   SafeAreaView,
   ScrollView,
   FlatList,
+  Modal,
+  Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
+import { useSavings } from './SavingsContext'; 
 import Icon from 'react-native-vector-icons/Feather'; // Changed from Ionicons to Feather
 
-// Mock data - in a real app, this would come from your backend/state management
-const userData = {
-  totalSaved: 785,
-  individualGoals: [
-    { id: '1', name: 'Vacation', target: 5000, saved: 785, dueDate: '2025-07-15' },
-    { id: '2', name: 'New Earphones', target: 2000, saved: 785, dueDate: '2025-05-20' },
-    { id: '3', name: 'Computer Mouse', target: 500, saved: 785, dueDate: '2025-12-31' },
-    { id: '4', name: 'New Watch', target: 4000, saved: 785, dueDate: '2025-04-10' },
-  ],
-  collaborativeGoals: [
-    { id: '5', name: 'Trip with Friends', target: 8000, saved: 420, dueDate: '2025-08-30', members: 4 },
-    { id: '6', name: 'Group Gift', target: 1500, saved: 255, dueDate: '2025-03-15', members: 5 },
-  ],
-};
-
 const GoalsPage = () => {
+  const { userData, updateUserData, totalSaved } = useSavings();
   const [goalType, setGoalType] = useState('individual');
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [manualTransferVisible, setManualTransferVisible] = useState(false);
+  const [transferAmount, setTransferAmount] = useState('');
+  const [selectedGoalId, setSelectedGoalId] = useState(null);
 
   // Calculate percentage for progress bars
   const calculatePercentage = (saved, target) => {
@@ -49,6 +44,58 @@ const GoalsPage = () => {
     console.log('Add new goal');
   };
 
+  // Open manual transfer modal for a specific goal
+  const openGoalTransfer = (goalId) => {
+    setSelectedGoalId(goalId);
+    setManualTransferVisible(true);
+  };
+
+  // Handle manual transfer submission
+  const handleManualTransfer = () => {
+    const amount = parseInt(transferAmount);
+    
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+      return;
+    }
+
+    // Find the selected goal
+    const selectedGoal = userData.goals.find(goal => goal.id === selectedGoalId);
+    
+    if (!selectedGoal) {
+      Alert.alert('Error', 'Selected goal not found');
+      return;
+    }
+
+    // Update the specific goal
+    const updatedGoals = userData.goals.map(goal => {
+      if (goal.id === selectedGoalId) {
+        return {
+          ...goal,
+          saved: goal.saved + amount
+        };
+      }
+      return goal;
+    });
+    
+    // Update the userData context
+    updateUserData({
+      ...userData,
+      goals: updatedGoals
+    });
+    
+    Alert.alert('Success', `₹${amount} added to ${selectedGoal.name}!`);
+    
+    // Reset and close the modal
+    setTransferAmount('');
+    setManualTransferVisible(false);
+  };
+
+  // Filter goals based on selected type
+  const filteredGoals = userData.goals.filter(goal => 
+    goalType === 'individual' ? goal.isIndividual : !goal.isIndividual
+  );
+
   const renderGoalItem = ({ item }) => {
     const percentage = calculatePercentage(item.saved, item.target);
     const dueDate = new Date(item.dueDate);
@@ -59,12 +106,22 @@ const GoalsPage = () => {
     });
 
     return (
-      <View style={styles.goalCard}>
+      <TouchableOpacity 
+        style={styles.goalCard}
+        onPress={() => openGoalTransfer(item.id)}
+      >
         <View style={styles.goalCardHeader}>
           <Text style={styles.goalName}>{item.name}</Text>
-          <TouchableOpacity>
-            <Icon name="more-vertical" size={18} color="#6c757d" />
-          </TouchableOpacity>
+          <View style={[
+            styles.priorityBadge, 
+            {
+              backgroundColor: 
+                item.priority === 'High' ? '#e03131' : 
+                item.priority === 'Medium' ? '#f59f00' : '#40c057'
+            }
+          ]}>
+            <Text style={styles.priorityText}>{item.priority}</Text>
+          </View>
         </View>
 
         <View style={styles.goalAmounts}>
@@ -77,8 +134,8 @@ const GoalsPage = () => {
             style={[
               styles.progressFill, 
               { width: `${percentage}%` },
-              percentage < 30 ? { backgroundColor: '#fa5252' } :
-              percentage < 70 ? { backgroundColor: '#fd7e14' } :
+              item.priority === 'High' ? { backgroundColor: '#e03131' } :
+              item.priority === 'Medium' ? { backgroundColor: '#f59f00' } :
                                { backgroundColor: '#40c057' }
             ]} 
           />
@@ -89,13 +146,15 @@ const GoalsPage = () => {
           <Text style={styles.dueDate}>Due: {formattedDate}</Text>
         </View>
 
-        {goalType === 'collaborative' && (
+        {!item.isIndividual && (
           <View style={styles.membersInfo}>
             <Icon name="users" size={16} color="#6c757d" />
             <Text style={styles.membersText}>{item.members} members</Text>
           </View>
         )}
-      </View>
+        
+        <Text style={styles.tapToAddText}>Tap to add money</Text>
+      </TouchableOpacity>
     );
   };
 
@@ -106,7 +165,7 @@ const GoalsPage = () => {
 
         <View style={styles.totalSavedChip}>
           <Text style={styles.totalSavedText}>
-            Total: ${userData.totalSaved.toLocaleString()}
+            Total: ₹{totalSaved.toLocaleString()}
           </Text>
         </View>
       </View>
@@ -165,13 +224,67 @@ const GoalsPage = () => {
       </View>
 
       <FlatList
-        data={goalType === 'individual' ? userData.individualGoals : userData.collaborativeGoals}
+        data={filteredGoals}
         renderItem={renderGoalItem}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.id.toString()}
         style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
+      
+      {/* Manual Transfer Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={manualTransferVisible}
+        onRequestClose={() => setManualTransferVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {selectedGoalId && `Add Money to: ${userData.goals.find(g => g.id === selectedGoalId)?.name}`}
+            </Text>
+            
+            {selectedGoalId && (
+              <Text style={styles.modalSubtitle}>
+                Priority: {userData.goals.find(g => g.id === selectedGoalId)?.priority}
+              </Text>
+            )}
+            
+            <Text style={styles.modalLabel}>Enter Amount (₹)</Text>
+            <TextInput
+              style={styles.amountInput}
+              value={transferAmount}
+              onChangeText={setTransferAmount}
+              placeholder="0"
+              keyboardType="number-pad"
+              autoFocus={true}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setTransferAmount('');
+                  setManualTransferVisible(false);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.addButton]}
+                onPress={handleManualTransfer}
+              >
+                <Text style={styles.addButtonText}>Add Money</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -296,6 +409,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#343a40',
   },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  priorityText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   goalAmounts: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -347,6 +470,91 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
     marginLeft: 6,
+  },
+  tapToAddText: {
+    fontSize: 14,
+    color: '#4c6ef5',
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#6c757d',
+    marginBottom: 16,
+  },
+  modalLabel: {
+    fontSize: 16,
+    color: '#495057',
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  amountInput: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    fontSize: 18,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    width: '48%',
+    height: 50,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#e9ecef',
+  },
+  cancelButtonText: {
+    color: '#495057',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  addButton: {
+    backgroundColor: '#4c6ef5',
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

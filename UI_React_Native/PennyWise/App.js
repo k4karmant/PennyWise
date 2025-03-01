@@ -1,13 +1,16 @@
 import React from 'react';
-import { StatusBar, SafeAreaView } from 'react-native';
-import SimpleTabs from './navigator'; // Update the path based on your project structure
+import { StatusBar } from 'react-native';
+import SimpleTabs from './navigator'; // Ensure the path is correct
+import { SavingsProvider } from './SavingsContext'; // Import SavingsContext
 
 const App = () => {
   return (
-    <>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <SimpleTabs />
-    </>
+    <SavingsProvider>
+      <>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <SimpleTabs />
+      </>
+    </SavingsProvider>
   );
 };
 
