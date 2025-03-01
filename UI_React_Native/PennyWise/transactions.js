@@ -23,7 +23,7 @@ const transactionData = [
   { 
     id: '2', 
     type: 'income', 
-    amount: 1200.00, 
+    amount: 25000.00, 
     category: 'Salary', 
     description: 'Monthly Salary', 
     date: '2025-02-25' 

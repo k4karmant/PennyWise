@@ -6,11 +6,16 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Image,
+  Modal,
+  StatusBar,
+  Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 // Mock data - in a real app, this would come from your backend/state management
-const userData = {
+const initialUserData = {
   name: 'Alex',
   totalSaved: 785,
   goals: [
@@ -21,7 +26,9 @@ const userData = {
 };
 
 const HomePage = () => {
-  const [activePaymentMethod, setActivePaymentMethod] = useState(null);
+  const [userData, setUserData] = useState(initialUserData);
+  const [manualTransferVisible, setManualTransferVisible] = useState(false);
+  const [transferAmount, setTransferAmount] = useState('');
 
   // Calculate percentage for progress bars
   const calculatePercentage = (saved, target) => {
@@ -29,15 +36,42 @@ const HomePage = () => {
     return percentage > 100 ? 100 : percentage;
   };
 
-  // Handle payment method selection
-  const handlePaymentMethod = (method) => {
-    setActivePaymentMethod(method);
-    // In a real app, this would navigate to the appropriate payment screen
-    console.log(`Selected payment method: {method}`);
+  // Open manual transfer modal
+  const openManualTransfer = () => {
+    setManualTransferVisible(true);
+  };
+
+  // Handle manual transfer submission
+  const handleManualTransfer = () => {
+    const amount = parseInt(transferAmount);
+    
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+      return;
+    }
+
+    // Update user data
+    const updatedGoals = userData.goals.map(goal => ({
+      ...goal,
+      saved: goal.saved + amount
+    }));
+
+    setUserData({
+      ...userData,
+      totalSaved: userData.totalSaved + amount,
+      goals: updatedGoals
+    });
+
+    // Reset and close the modal
+    setTransferAmount('');
+    setManualTransferVisible(false);
+    
+    Alert.alert('Success', `₹${amount} added to your savings!`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Header with greeting */}
         <View style={styles.header}>
@@ -97,7 +131,7 @@ const HomePage = () => {
           <View style={styles.paymentGrid}>
             <TouchableOpacity 
               style={styles.paymentButton}
-              onPress={() => handlePaymentMethod('qr')}
+              onPress={() => console.log('QR scan clicked')}
             >
               <View style={styles.paymentIcon}>
                 <Text style={styles.paymentIconText}>QR</Text>
@@ -107,7 +141,7 @@ const HomePage = () => {
             
             <TouchableOpacity 
               style={styles.paymentButton}
-              onPress={() => handlePaymentMethod('contact')}
+              onPress={() => console.log('Contact payment clicked')}
             >
               <View style={styles.paymentIcon}>
                 <Text style={styles.paymentIconText}>👤</Text>
@@ -117,7 +151,7 @@ const HomePage = () => {
             
             <TouchableOpacity 
               style={styles.paymentButton}
-              onPress={() => handlePaymentMethod('upi')}
+              onPress={() => console.log('UPI payment clicked')}
             >
               <View style={styles.paymentIcon}>
                 <Text style={styles.paymentIconText}>UPI</Text>
@@ -127,7 +161,7 @@ const HomePage = () => {
             
             <TouchableOpacity 
               style={styles.paymentButton}
-              onPress={() => handlePaymentMethod('manual')}
+              onPress={openManualTransfer}
             >
               <View style={styles.paymentIcon}>
                 <Text style={styles.paymentIconText}>₹</Text>
@@ -137,6 +171,52 @@ const HomePage = () => {
           </View>
         </View>
       </ScrollView>
+      
+      {/* Manual Transfer Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={manualTransferVisible}
+        onRequestClose={() => setManualTransferVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Money</Text>
+            
+            <Text style={styles.modalLabel}>Enter Amount (₹)</Text>
+            <TextInput
+              style={styles.amountInput}
+              value={transferAmount}
+              onChangeText={setTransferAmount}
+              placeholder="0"
+              keyboardType="number-pad"
+              autoFocus={true}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setTransferAmount('');
+                  setManualTransferVisible(false);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.addButton]}
+                onPress={handleManualTransfer}
+              >
+                <Text style={styles.addButtonText}>Add Money</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -273,6 +353,78 @@ const styles = StyleSheet.create({
   paymentText: {
     fontSize: 14,
     color: '#495057',
+    fontWeight: '500',
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 16,
+    color: '#495057',
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  amountInput: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    fontSize: 18,
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    width: '48%',
+    height: 50,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#e9ecef',
+  },
+  cancelButtonText: {
+    color: '#495057',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  addButton: {
+    backgroundColor: '#4c6ef5',
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '500',
   },
 });
