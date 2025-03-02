@@ -6,129 +6,42 @@ import {
   SafeAreaView,
   FlatList,
   TouchableOpacity,
+  StatusBar,
 } from 'react-native';
-import Feather from 'react-native-vector-icons/Feather'; // Changed from Ionicons to Feather
-
-// Mock data - in a real app, this would come from your backend/state management
-const transactionData = [
-  { 
-    id: '1', 
-    type: 'expense', 
-    amount: 58.99, 
-    category: 'Food & Dining', 
-    description: 'Grocery Store', 
-    date: '2025-02-28',
-    goalName: 'Emergency Fund'
-  },
-  { 
-    id: '2', 
-    type: 'income', 
-    amount: 25000.00, 
-    category: 'Salary', 
-    description: 'Monthly Salary', 
-    date: '2025-02-25' 
-  },
-  { 
-    id: '3', 
-    type: 'expense', 
-    amount: 12.50, 
-    category: 'Transportation', 
-    description: 'Uber Ride', 
-    date: '2025-02-24',
-    goalName: 'Vacation'
-  },
-  { 
-    id: '4', 
-    type: 'expense', 
-    amount: 35.00, 
-    category: 'Entertainment', 
-    description: 'Movie Tickets', 
-    date: '2025-02-22',
-    goalName: 'Entertainment Budget'
-  },
-  { 
-    id: '5', 
-    type: 'income', 
-    amount: 250.00, 
-    category: 'Freelance', 
-    description: 'Design Project', 
-    date: '2025-02-20' 
-  },
-  { 
-    id: '6', 
-    type: 'expense', 
-    amount: 120.75, 
-    category: 'Shopping', 
-    description: 'Clothing Store', 
-    date: '2025-02-19',
-    goalName: 'New Laptop'
-  },
-  { 
-    id: '7', 
-    type: 'income', 
-    amount: 45.00, 
-    category: 'Refund', 
-    description: 'Return Item', 
-    date: '2025-02-18' 
-  },
-  { 
-    id: '8', 
-    type: 'expense', 
-    amount: 9.99, 
-    category: 'Subscriptions', 
-    description: 'Streaming Service', 
-    date: '2025-02-15',
-    goalName: 'Entertainment Budget'
-  },
-  { 
-    id: '9', 
-    type: 'expense', 
-    amount: 85.65, 
-    category: 'Utilities', 
-    description: 'Electricity Bill', 
-    date: '2025-02-10',
-    goalName: 'Emergency Fund'
-  },
-  { 
-    id: '10', 
-    type: 'income', 
-    amount: 30.00, 
-    category: 'Gift', 
-    description: 'Birthday Gift', 
-    date: '2025-02-05' 
-  },
-];
-
-// Group transactions by date
-const groupTransactionsByDate = (transactions) => {
-  const grouped = {};
-  
-  transactions.forEach(transaction => {
-    const date = transaction.date;
-    if (!grouped[date]) {
-      grouped[date] = [];
-    }
-    grouped[date].push(transaction);
-  });
-  
-  // Convert to array format for FlatList
-  return Object.keys(grouped)
-    .sort((a, b) => new Date(b) - new Date(a)) // Sort dates in descending order
-    .map(date => ({
-      date,
-      data: grouped[date]
-    }));
-};
+import { useSavings } from './SavingsContext'; // Import the useSavings hook
+import Feather from 'react-native-vector-icons/Feather';
 
 const TransactionHistoryPage = () => {
   const [filter, setFilter] = useState('all'); // 'all', 'income', 'expense'
+  const { transactions } = useSavings(); // Get transactions from context
   
   // Filter transactions based on selected filter
-  const filteredTransactions = transactionData.filter(transaction => {
+  const filteredTransactions = transactions.filter(transaction => {
     if (filter === 'all') return true;
     return transaction.type === filter;
   });
   
+  // Group transactions by date
+  const groupTransactionsByDate = (transactions) => {
+    const grouped = {};
+    
+    transactions.forEach(transaction => {
+      const date = transaction.date;
+      if (!grouped[date]) {
+        grouped[date] = [];
+      }
+      grouped[date].push(transaction);
+    });
+    
+    // Convert to array format for FlatList
+    return Object.keys(grouped)
+      .sort((a, b) => new Date(b) - new Date(a)) // Sort dates in descending order
+      .map(date => ({
+        date,
+        data: grouped[date]
+      }));
+  };
+
   const groupedTransactions = groupTransactionsByDate(filteredTransactions);
 
   const formatDate = (dateString) => {
@@ -161,7 +74,7 @@ const TransactionHistoryPage = () => {
           <Feather 
             name={isExpense ? 'arrow-down' : 'arrow-up'} 
             size={16} 
-            color={isExpense ? 'white' : 'white'}
+            color="white"
             style={{ backgroundColor: isExpense ? '#fa5252' : '#40c057', padding: 4, borderRadius: 12 }}
           />
         </View>
@@ -204,10 +117,50 @@ const TransactionHistoryPage = () => {
     );
   };
 
+  // Calculate totals for summary card
+  const calculateTotals = () => {
+    let income = 0;
+    let expense = 0;
+    
+    filteredTransactions.forEach(transaction => {
+      if (transaction.type === 'income') {
+        income += transaction.amount;
+      } else {
+        expense += transaction.amount;
+      }
+    });
+    
+    return {
+      income,
+      expense,
+      balance: income - expense
+    };
+  };
+
+  const totals = calculateTotals();
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <View style={styles.header}>
         <Text style={styles.title}>Transaction History</Text>
+      </View>
+      
+      {/* Summary Cards */}
+      <View style={styles.summaryContainer}>
+        <View style={[styles.summaryCard, { backgroundColor: '#e7f5ff' }]}>
+          <Text style={styles.summaryLabel}>Income</Text>
+          <Text style={[styles.summaryAmount, { color: '#4c6ef5' }]}>
+            ₹{totals.income.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+        </View>
+        
+        <View style={[styles.summaryCard, { backgroundColor: '#fff9db' }]}>
+          <Text style={styles.summaryLabel}>Expenses</Text>
+          <Text style={[styles.summaryAmount, { color: '#fd7e14' }]}>
+            ₹{totals.expense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+        </View>
       </View>
       
       <View style={styles.filterContainer}>
@@ -259,6 +212,11 @@ const TransactionHistoryPage = () => {
         <View style={styles.emptyState}>
           <Feather name="file-text" size={48} color="#adb5bd" />
           <Text style={styles.emptyStateText}>No transactions found</Text>
+          {filter !== 'all' && (
+            <Text style={styles.emptyStateSubtext}>
+              Try changing your filter selection
+            </Text>
+          )}
         </View>
       ) : (
         <FlatList
@@ -289,10 +247,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#212529',
   },
+  summaryContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 8,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginBottom: 4,
+  },
+  summaryAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
   filterContainer: {
     flexDirection: 'row',
-    padding: 16,
-    paddingTop: 8,
+    paddingHorizontal: 16,
     paddingBottom: 12,
   },
   filterButton: {
@@ -338,6 +315,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginVertical: 4,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    elevation: 1,
   },
   transactionIcon: {
     marginRight: 12,
@@ -376,6 +356,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: '#6c757d',
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#adb5bd',
     textAlign: 'center',
   },
 });

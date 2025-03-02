@@ -9,43 +9,77 @@ import {
   FlatList,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-
-// Mock data for the chart
-const chartData = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-  datasets: [
-    {
-      data: [180, 100, 250, 275, 136, 256],
-      color: (opacity = 1) => `rgba(76, 110, 245, ${opacity})`,
-      strokeWidth: 3,
-    },
-  ],
-};
-
-// Mock data for savings history
-const savingsHistory = [
-  { id: '1', date: '2025-02-28', time: '14:32', transactionAmount: 58, savedAmount: 2, description: 'Veggies' },
-  { id: '2', date: '2025-02-25', time: '09:15', transactionAmount: 77, savedAmount: 3, description: 'Milk' },
-  { id: '3', date: '2025-02-24', time: '18:45', transactionAmount: 26, savedAmount: 4, description: 'Uber Ride' },
-  { id: '4', date: '2025-02-22', time: '20:10', transactionAmount: 35, savedAmount: 0, description: 'Snacks' },
-];
+import { useSavings } from './SavingsContext'; // Import the useSavings hook
 
 const SavingsHistoryPage = () => {
+  const { transactions } = useSavings(); // Get transactions from context
   const screenWidth = Dimensions.get('window').width;
+
+  // Filter transactions to only show UPI payments with rounded savings
+  const savingsTransactions = transactions.filter(
+    transaction => transaction.type === 'expense' && 
+                  transaction.category === 'UPI Payment' && 
+                  transaction.roundedSavings > 0
+  );
+
+  // Prepare data for the chart - group by month and sum savings
+  const prepareChartData = () => {
+    const monthlyData = {};
+    
+    // Group transactions by month
+    savingsTransactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const month = date.toLocaleString('default', { month: 'short' });
+      
+      if (!monthlyData[month]) {
+        monthlyData[month] = 0;
+      }
+      
+      monthlyData[month] += transaction.roundedSavings;
+    });
+    
+    // Convert to arrays for the chart
+    const months = Object.keys(monthlyData).slice(-6); // Get last 6 months
+    const values = months.map(month => monthlyData[month]);
+    
+    // If we have fewer than 6 months of data, pad with empty months
+    while (months.length < 6) {
+      months.unshift('');
+      values.unshift(0);
+    }
+    
+    return {
+      labels: months,
+      datasets: [
+        {
+          data: values.length > 0 ? values : [0, 0, 0, 0, 0, 0], // Default if no data
+          color: (opacity = 1) => `rgba(76, 110, 245, ${opacity})`,
+          strokeWidth: 3,
+        },
+      ],
+    };
+  };
+
+  const chartData = prepareChartData();
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  };
+  
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   const renderSavingsItem = ({ item }) => (
     <View style={styles.savingsItem}>
       <View style={styles.savingsInfo}>
         <Text style={styles.savingsDescription}>{item.description}</Text>
-        <Text style={styles.dateTime}>{formatDate(item.date)} • {item.time}</Text>
+        <Text style={styles.dateTime}>{formatDate(item.date)} • {formatTime(item.date)}</Text>
       </View>
       <View style={styles.savingsAmounts}>
-        <Text style={styles.transactionAmount}>₹{item.transactionAmount.toFixed(2)}</Text>
-        <Text style={styles.savedAmount}>+₹{item.savedAmount.toFixed(2)}</Text>
+        <Text style={styles.transactionAmount}>₹{item.amount.toFixed(2)}</Text>
+        <Text style={styles.savedAmount}>+₹{item.roundedSavings.toFixed(2)}</Text>
       </View>
     </View>
   );
@@ -80,7 +114,18 @@ const SavingsHistoryPage = () => {
 
         <View style={styles.historySection}>
           <Text style={styles.sectionTitle}>Savings Transactions</Text>
-          <FlatList data={savingsHistory} renderItem={renderSavingsItem} keyExtractor={item => item.id} scrollEnabled={false} />
+          {savingsTransactions.length > 0 ? (
+            <FlatList 
+              data={savingsTransactions} 
+              renderItem={renderSavingsItem} 
+              keyExtractor={item => item.id} 
+              scrollEnabled={false} 
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No UPI transactions with rounded savings yet</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -105,6 +150,8 @@ const styles = StyleSheet.create({
   savingsAmounts: { minWidth: 140, alignItems: 'flex-end' },
   transactionAmount: { fontSize: 16, fontWeight: '600', color: '#fa5252' },
   savedAmount: { fontSize: 16, fontWeight: '600', color: '#4c6ef5' },
+  emptyState: { backgroundColor: 'white', padding: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  emptyStateText: { fontSize: 16, color: '#6c757d', textAlign: 'center' },
 });
 
 export default SavingsHistoryPage;

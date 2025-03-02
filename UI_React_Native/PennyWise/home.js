@@ -23,10 +23,18 @@ const priorityColors = {
 };
 
 const HomePage = () => {
-  const { userData, updateUserData, totalSaved } = useSavings();
+  const { userData, updateUserData, totalSaved, addTransaction } = useSavings();
   const [manualTransferVisible, setManualTransferVisible] = useState(false);
   const [transferAmount, setTransferAmount] = useState('');
   const [selectedGoalId, setSelectedGoalId] = useState(null);
+  
+  // Round-off functionality
+  const [upiPaymentVisible, setUpiPaymentVisible] = useState(false);
+  const [upiAmount, setUpiAmount] = useState('');
+  const [wallet, setWallet] = useState(0);
+  
+  // Track transaction count for display purposes
+  const [transactionCount, setTransactionCount] = useState(0);
 
   // Calculate percentage for progress bars
   const calculatePercentage = (saved, target) => {
@@ -49,6 +57,94 @@ const HomePage = () => {
     setManualTransferVisible(true);
   };
 
+  // Open UPI payment modal
+  const openUpiPayment = () => {
+    setUpiPaymentVisible(true);
+  };
+
+  // Handle UPI payment with round-off savings
+  const handleUpiPayment = () => {
+    const numAmount = parseFloat(upiAmount);
+    
+    if (isNaN(numAmount) || numAmount <= 0) {
+      Alert.alert("Invalid input", "Please enter a valid amount.");
+      return;
+    }
+    
+    // Calculate round-up amount
+    let roundUp = 0;
+    if (numAmount < 100) {
+      roundUp = Math.ceil(numAmount / 5) * 5;
+    } else {
+      roundUp = Math.ceil(numAmount / 10) * 10;
+    }
+    
+    const difference = roundUp - numAmount;
+    
+    // Update wallet
+    setWallet(wallet + numAmount);
+    
+    // Update transaction count
+    setTransactionCount(transactionCount + 1);
+    
+    // Distribute the rounded up amount to goals based on priority
+    const priorities = {
+      'High': 3,
+      'Medium': 2,
+      'Low': 1
+    };
+    
+    // Only consider individual goals for automatic distribution
+    const relevantGoals = userData.goals.filter(goal => goal.isIndividual);
+    const totalPriorityPoints = relevantGoals.reduce((sum, goal) => sum + priorities[goal.priority], 0);
+    
+    const updatedGoals = userData.goals.map(goal => {
+      // Only distribute to individual goals
+      if (goal.isIndividual) {
+        const priorityWeight = priorities[goal.priority] / totalPriorityPoints;
+        const goalAmount = Math.round(difference * priorityWeight);
+        
+        return {
+          ...goal,
+          saved: goal.saved + goalAmount
+        };
+      }
+      return goal;
+    });
+    
+    // Get goal with highest priority for transaction record
+    let primaryGoal = relevantGoals.reduce((prev, current) => {
+      return priorities[current.priority] > priorities[prev.priority] ? current : prev;
+    }, relevantGoals[0]);
+    
+    // Add transaction to global history
+    addTransaction({
+      id: Date.now().toString(),
+      type: 'expense',
+      amount: numAmount,
+      category: 'UPI Payment',
+      description: 'UPI Transaction',
+      date: new Date().toISOString().split('T')[0],
+      goalName: difference > 0 ? primaryGoal.name : undefined,
+      roundedSavings: difference
+    });
+    
+    // Update userData with new goals
+    updateUserData({
+      ...userData,
+      goals: updatedGoals
+    });
+    
+    Alert.alert(
+      "Payment Successful!", 
+      `₹${numAmount.toFixed(2)} paid and ₹${difference.toFixed(2)} added to savings!`
+    );
+    
+    // Reset and close modal
+    setUpiAmount('');
+    setUpiPaymentVisible(false);
+  };
+
   // Handle manual transfer submission
   const handleManualTransfer = () => {
     const amount = parseInt(transferAmount);
@@ -60,11 +156,13 @@ const HomePage = () => {
 
     // Update user data
     let updatedGoals;
+    let targetGoalName;
     
     if (selectedGoalId) {
       // Add to specific goal
       updatedGoals = userData.goals.map(goal => {
         if (goal.id === selectedGoalId) {
+          targetGoalName = goal.name;
           return {
             ...goal,
             saved: goal.saved + amount
@@ -100,8 +198,26 @@ const HomePage = () => {
         return goal;
       });
       
+      // Get highest priority goal for the record
+      let primaryGoal = relevantGoals.reduce((prev, current) => {
+        return priorities[current.priority] > priorities[prev.priority] ? current : prev;
+      }, relevantGoals[0]);
+      
+      targetGoalName = "Multiple Goals";
+      
       Alert.alert('Success', `₹${amount} distributed across your individual goals based on priority!`);
     }
+
+    // Add transaction to global history
+    addTransaction({
+      id: Date.now().toString(),
+      type: 'income',
+      amount: amount,
+      category: 'Savings Deposit',
+      description: 'Manual Transfer',
+      date: new Date().toISOString().split('T')[0],
+      goalName: targetGoalName
+    });
 
     // Update userData with new goals
     updateUserData({
@@ -129,10 +245,15 @@ const HomePage = () => {
           </View>
         </View>
 
-        {/* Total savings card */}
+        {/* Total savings card - now includes all savings */}
         <View style={styles.savingsCard}>
           <Text style={styles.savingsLabel}>Total Money Saved</Text>
           <Text style={styles.savingsAmount}>₹{totalSaved.toLocaleString()}</Text>
+          {transactionCount > 0 && (
+            <Text style={styles.savingsSubtext}>
+              Including round-ups from {transactionCount} transaction(s)
+            </Text>
+          )}
         </View>
 
         {/* Goals with progress bars */}
@@ -205,7 +326,7 @@ const HomePage = () => {
             
             <TouchableOpacity 
               style={styles.paymentButton}
-              onPress={() => console.log('UPI payment clicked')}
+              onPress={openUpiPayment}
             >
               <View style={styles.paymentIcon}>
                 <Text style={styles.paymentIconText}>UPI</Text>
@@ -287,6 +408,78 @@ const HomePage = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      
+      {/* UPI Payment Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={upiPaymentVisible}
+        onRequestClose={() => setUpiPaymentVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              UPI Payment with Round-Off Savings
+            </Text>
+            
+            <Text style={styles.roundOffExplanation}>
+              The amount you pay will be rounded up, and the difference will be added to your savings goals based on their priorities.
+            </Text>
+            
+            <Text style={styles.modalLabel}>Enter Amount (₹)</Text>
+            <TextInput
+              style={styles.amountInput}
+              value={upiAmount}
+              onChangeText={setUpiAmount}
+              placeholder="0"
+              keyboardType="number-pad"
+              autoFocus={true}
+            />
+            
+            <Text style={styles.roundOffPreview}>
+              {!isNaN(parseFloat(upiAmount)) && parseFloat(upiAmount) > 0 ? (
+                <>
+                  You'll pay: ₹{parseFloat(upiAmount).toFixed(2)}
+                  {'\n'}
+                  Will be rounded to: ₹{
+                    parseFloat(upiAmount) < 100 
+                      ? Math.ceil(parseFloat(upiAmount) / 5) * 5 
+                      : Math.ceil(parseFloat(upiAmount) / 10) * 10
+                  }.00
+                  {'\n'}
+                  Savings: ₹{(
+                    parseFloat(upiAmount) < 100 
+                      ? Math.ceil(parseFloat(upiAmount) / 5) * 5 - parseFloat(upiAmount)
+                      : Math.ceil(parseFloat(upiAmount) / 10) * 10 - parseFloat(upiAmount)
+                  ).toFixed(2)}
+                </>
+              ) : 'Enter an amount to see savings preview'}
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setUpiAmount('');
+                  setUpiPaymentVisible(false);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.addButton]}
+                onPress={handleUpiPayment}
+              >
+                <Text style={styles.addButtonText}>Pay Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -344,6 +537,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 32,
     fontWeight: 'bold',
+  },
+  savingsSubtext: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    marginTop: 8,
   },
   goalSection: {
     marginBottom: 24,
@@ -454,7 +652,6 @@ const styles = StyleSheet.create({
     color: '#495057',
     fontWeight: '500',
   },
-  // Modal styles
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -510,6 +707,24 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  roundOffExplanation: {
+    fontSize: 14,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  roundOffPreview: {
+    fontSize: 14,
+    color: '#495057',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    width: '100%',
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   modalButtons: {
     flexDirection: 'row',

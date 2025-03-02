@@ -9,6 +9,9 @@ apply plugin: "com.facebook.react"
  project.ext.react = [
     codegenDir: null
 ]
+dependencies {
+    implementation 'com.google.mlkit:barcode-scanning:17.2.0'
+}
 
 react {
     /* Folders */
