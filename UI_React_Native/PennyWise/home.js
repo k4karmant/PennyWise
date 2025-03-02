@@ -44,6 +44,15 @@ const HomePage = () => {
 
   // Filter goals to only show individual goals
   const individualGoals = userData.goals.filter(goal => goal.isIndividual);
+  
+  // Get the top 3 goals closest to completion
+  const topThreeGoals = [...individualGoals]
+    .sort((a, b) => {
+      const percentageA = calculatePercentage(a.saved, a.target);
+      const percentageB = calculatePercentage(b.saved, b.target);
+      return percentageB - percentageA; // Sort by highest percentage first
+    })
+    .slice(0, 3); // Take only the top 3
 
   // Open manual transfer modal
   const openManualTransfer = () => {
@@ -256,47 +265,58 @@ const HomePage = () => {
           )}
         </View>
 
-        {/* Goals with progress bars */}
+        {/* Goals with progress bars - only top 3 closest to completion */}
         <View style={styles.goalSection}>
-          <Text style={styles.sectionTitle}>Your Individual Goals</Text>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Top Goals</Text>
+            <TouchableOpacity onPress={() => console.log('View All Goals')}>
+              <Text style={styles.viewAllLink}>View All</Text>
+            </TouchableOpacity>
+          </View>
           
-          {individualGoals.map((goal, index) => {
-            const percentage = calculatePercentage(goal.saved, goal.target);
-            
-            return (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.goalItem}
-                onPress={() => openGoalTransfer(goal.id)}
-              >
-                <View style={styles.goalHeader}>
-                  <View style={styles.goalNameContainer}>
-                    <Text style={styles.goalName}>{goal.name}</Text>
-                    <View style={[styles.priorityBadge, { backgroundColor: priorityColors[goal.priority] }]}>
-                      <Text style={styles.priorityText}>{goal.priority}</Text>
+          {topThreeGoals.length > 0 ? (
+            topThreeGoals.map((goal, index) => {
+              const percentage = calculatePercentage(goal.saved, goal.target);
+              
+              return (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.goalItem}
+                  onPress={() => openGoalTransfer(goal.id)}
+                >
+                  <View style={styles.goalHeader}>
+                    <View style={styles.goalNameContainer}>
+                      <Text style={styles.goalName}>{goal.name}</Text>
+                      <View style={[styles.priorityBadge, { backgroundColor: priorityColors[goal.priority] }]}>
+                        <Text style={styles.priorityText}>{goal.priority}</Text>
+                      </View>
                     </View>
+                    <Text style={styles.goalAmount}>
+                      ₹{goal.saved.toLocaleString()} / ₹{goal.target.toLocaleString()}
+                    </Text>
                   </View>
-                  <Text style={styles.goalAmount}>
-                    ₹{goal.saved.toLocaleString()} / ₹{goal.target.toLocaleString()}
-                  </Text>
-                </View>
-                
-                <View style={styles.progressBackground}>
-                  <View 
-                    style={[
-                      styles.progressFill, 
-                      { width: `${percentage}%`, backgroundColor: priorityColors[goal.priority] }
-                    ]} 
-                  />
-                </View>
-                
-                <View style={styles.goalFooter}>
-                  <Text style={styles.percentageText}>{Math.round(percentage)}% complete</Text>
-                  <Text style={styles.tapToAddText}>Tap to add money</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                  
+                  <View style={styles.progressBackground}>
+                    <View 
+                      style={[
+                        styles.progressFill, 
+                        { width: `${percentage}%`, backgroundColor: priorityColors[goal.priority] }
+                      ]} 
+                    />
+                  </View>
+                  
+                  <View style={styles.goalFooter}>
+                    <Text style={styles.percentageText}>{Math.round(percentage)}% complete</Text>
+                    <Text style={styles.tapToAddText}>Tap to add money</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <View style={styles.noGoalsMessage}>
+              <Text style={styles.noGoalsText}>No individual goals set yet</Text>
+            </View>
+          )}
         </View>
 
         {/* Payment methods */}
@@ -546,11 +566,21 @@ const styles = StyleSheet.create({
   goalSection: {
     marginBottom: 24,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
     color: '#212529',
+  },
+  viewAllLink: {
+    fontSize: 14,
+    color: '#4c6ef5',
+    fontWeight: '500',
   },
   goalItem: {
     marginBottom: 16,
@@ -613,6 +643,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4c6ef5',
     fontStyle: 'italic',
+  },
+  noGoalsMessage: {
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  noGoalsText: {
+    color: '#6c757d',
+    fontSize: 16,
   },
   paymentSection: {
     marginBottom: 24,

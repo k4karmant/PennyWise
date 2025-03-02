@@ -16,6 +16,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSavings } from './SavingsContext';
+import GoalAnalysisModal from './GoalAnalysisModal'; // Import our new component
 
 const AddGoalModal = ({ visible, onClose }) => {
   const { userData, updateUserData } = useSavings();
@@ -26,8 +27,7 @@ const AddGoalModal = ({ visible, onClose }) => {
   const [members, setMembers] = useState('1');
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // Default: 30 days from now
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [priorityDropdownVisible, setPriorityDropdownVisible] = useState(false);
-  const [typeDropdownVisible, setTypeDropdownVisible] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState(null); // Track which dropdown is active
 
   const resetForm = () => {
     setGoalName('');
@@ -36,6 +36,7 @@ const AddGoalModal = ({ visible, onClose }) => {
     setIsIndividual(true);
     setMembers('1');
     setDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    setActiveDropdown(null);
   };
 
   const handleCancel = () => {
@@ -96,19 +97,26 @@ const AddGoalModal = ({ visible, onClose }) => {
     }
   };
 
+  // Modified dropdown toggle functions
   const togglePriorityDropdown = () => {
-    setPriorityDropdownVisible(!priorityDropdownVisible);
-    if (typeDropdownVisible) setTypeDropdownVisible(false);
+    if (activeDropdown === 'priority') {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown('priority');
+    }
   };
 
   const toggleTypeDropdown = () => {
-    setTypeDropdownVisible(!typeDropdownVisible);
-    if (priorityDropdownVisible) setPriorityDropdownVisible(false);
+    if (activeDropdown === 'type') {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown('type');
+    }
   };
 
   const selectPriority = (selected) => {
     setPriority(selected);
-    setPriorityDropdownVisible(false);
+    setActiveDropdown(null);
   };
 
   const selectType = (isIndiv) => {
@@ -118,7 +126,14 @@ const AddGoalModal = ({ visible, onClose }) => {
     } else {
       setMembers('1');
     }
-    setTypeDropdownVisible(false);
+    setActiveDropdown(null);
+  };
+
+  // Close all dropdowns when clicking outside
+  const handleOutsideClick = () => {
+    if (activeDropdown) {
+      setActiveDropdown(null);
+    }
   };
 
   const formattedDate = dueDate.toLocaleDateString('en-US', {
@@ -126,6 +141,16 @@ const AddGoalModal = ({ visible, onClose }) => {
     day: 'numeric',
     year: 'numeric',
   });
+
+  // Calculate positions for dropdowns based on their parent components
+  const getTypeDropdownPosition = () => {
+    return { top: 50 }; // Adjust based on your form layout
+  };
+
+  const getPriorityDropdownPosition = () => {
+    // Adjust based on whether "Number of Members" field is showing
+    return { top: 50 }; // Adjust based on your form layout
+  };
 
   return (
     <Modal
@@ -138,203 +163,225 @@ const AddGoalModal = ({ visible, onClose }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalContainer}
       >
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Create New Goal</Text>
-            <TouchableOpacity onPress={handleCancel}>
-              <Icon name="x" size={24} color="#495057" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.formContainer}>
-            <Text style={styles.inputLabel}>Goal Name</Text>
-            <TextInput
-              style={styles.textInput}
-              value={goalName}
-              onChangeText={setGoalName}
-              placeholder="Enter goal name"
-              maxLength={30}
-            />
-
-            <Text style={styles.inputLabel}>Target Amount (₹)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={targetAmount}
-              onChangeText={setTargetAmount}
-              placeholder="0"
-              keyboardType="number-pad"
-            />
-
-            <Text style={styles.inputLabel}>Goal Type</Text>
-            <View style={styles.dropdownContainer}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={toggleTypeDropdown}
-              >
-                <Text style={styles.dropdownButtonText}>
-                  {isIndividual ? 'Individual Goal' : 'Collaborative Goal'}
-                </Text>
-                <Icon
-                  name={typeDropdownVisible ? "chevron-up" : "chevron-down"}
-                  size={18}
-                  color="#343a40"
-                />
+        <TouchableOpacity
+          style={styles.outsideClickArea}
+          activeOpacity={1}
+          onPress={handleOutsideClick}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Create New Goal</Text>
+              <TouchableOpacity onPress={handleCancel}>
+                <Icon name="x" size={24} color="#495057" />
               </TouchableOpacity>
-
-              {typeDropdownVisible && (
-                <View style={styles.dropdown}>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => selectType(true)}
-                  >
-                    <Text style={[
-                      styles.dropdownItemText,
-                      isIndividual && styles.activeDropdownItem
-                    ]}>
-                      Individual Goal
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => selectType(false)}
-                  >
-                    <Text style={[
-                      styles.dropdownItemText,
-                      !isIndividual && styles.activeDropdownItem
-                    ]}>
-                      Collaborative Goal
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
 
-            {!isIndividual && (
-              <>
-                <Text style={styles.inputLabel}>Number of Members</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={members}
-                  onChangeText={setMembers}
-                  placeholder="2"
-                  keyboardType="number-pad"
-                />
-              </>
-            )}
-
-            <Text style={styles.inputLabel}>Priority</Text>
-            <View style={styles.dropdownContainer}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={togglePriorityDropdown}
-              >
-                <View style={styles.priorityButtonContent}>
-                  <View style={[
-                    styles.priorityDot,
-                    {
-                      backgroundColor:
-                        priority === 'High' ? '#e03131' :
-                        priority === 'Medium' ? '#f59f00' : '#40c057'
-                    }
-                  ]} />
-                  <Text style={styles.dropdownButtonText}>{priority}</Text>
-                </View>
-                <Icon
-                  name={priorityDropdownVisible ? "chevron-up" : "chevron-down"}
-                  size={18}
-                  color="#343a40"
-                />
-              </TouchableOpacity>
-
-              {priorityDropdownVisible && (
-                <View style={styles.dropdown}>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => selectPriority('High')}
-                  >
-                    <View style={styles.priorityItem}>
-                      <View style={[styles.priorityDot, { backgroundColor: '#e03131' }]} />
-                      <Text style={[
-                        styles.dropdownItemText,
-                        priority === 'High' && styles.activeDropdownItem
-                      ]}>
-                        High
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => selectPriority('Medium')}
-                  >
-                    <View style={styles.priorityItem}>
-                      <View style={[styles.priorityDot, { backgroundColor: '#f59f00' }]} />
-                      <Text style={[
-                        styles.dropdownItemText,
-                        priority === 'Medium' && styles.activeDropdownItem
-                      ]}>
-                        Medium
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => selectPriority('Low')}
-                  >
-                    <View style={styles.priorityItem}>
-                      <View style={[styles.priorityDot, { backgroundColor: '#40c057' }]} />
-                      <Text style={[
-                        styles.dropdownItemText,
-                        priority === 'Low' && styles.activeDropdownItem
-                      ]}>
-                        Low
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.inputLabel}>Due Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
+            <ScrollView 
+              style={styles.formContainer}
+              scrollEnabled={activeDropdown === null} // Disable scrolling when dropdown is open
+              keyboardShouldPersistTaps="handled"
             >
-              <Text style={styles.dateButtonText}>{formattedDate}</Text>
-              <Icon name="calendar" size={18} color="#343a40" />
-            </TouchableOpacity>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={dueDate}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-                minimumDate={new Date()}
+              <Text style={styles.inputLabel}>Goal Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={goalName}
+                onChangeText={setGoalName}
+                placeholder="Enter goal name"
+                maxLength={30}
               />
-            )}
-          </ScrollView>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={styles.cancelButton} 
-              onPress={handleCancel}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.saveButton} 
-              onPress={handleSave}
-            >
-              <Text style={styles.saveButtonText}>Save Goal</Text>
-            </TouchableOpacity>
+              <Text style={styles.inputLabel}>Target Amount (₹)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={targetAmount}
+                onChangeText={setTargetAmount}
+                placeholder="0"
+                keyboardType="number-pad"
+              />
+
+              <Text style={styles.inputLabel}>Goal Type</Text>
+              <View style={styles.dropdownWrapper}>
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={toggleTypeDropdown}
+                >
+                  <Text style={styles.dropdownButtonText}>
+                    {isIndividual ? 'Individual Goal' : 'Collaborative Goal'}
+                  </Text>
+                  <Icon
+                    name={activeDropdown === 'type' ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#343a40"
+                  />
+                </TouchableOpacity>
+
+                {activeDropdown === 'type' && (
+                  <View style={[styles.dropdown, getTypeDropdownPosition()]}>
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => selectType(true)}
+                    >
+                      <Text style={[
+                        styles.dropdownItemText,
+                        isIndividual && styles.activeDropdownItem
+                      ]}>
+                        Individual Goal
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => selectType(false)}
+                    >
+                      <Text style={[
+                        styles.dropdownItemText,
+                        !isIndividual && styles.activeDropdownItem
+                      ]}>
+                        Collaborative Goal
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Add spacing to accommodate dropdown */}
+              {activeDropdown === 'type' && <View style={styles.dropdownSpaceFiller} />}
+
+              {!isIndividual && (
+                <>
+                  <Text style={styles.inputLabel}>Number of Members</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={members}
+                    onChangeText={setMembers}
+                    placeholder="2"
+                    keyboardType="number-pad"
+                  />
+                </>
+              )}
+
+              <Text style={styles.inputLabel}>Priority</Text>
+              <View style={styles.dropdownWrapper}>
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={togglePriorityDropdown}
+                >
+                  <View style={styles.priorityButtonContent}>
+                    <View style={[
+                      styles.priorityDot,
+                      {
+                        backgroundColor:
+                          priority === 'High' ? '#e03131' :
+                          priority === 'Medium' ? '#f59f00' : '#40c057'
+                      }
+                    ]} />
+                    <Text style={styles.dropdownButtonText}>{priority}</Text>
+                  </View>
+                  <Icon
+                    name={activeDropdown === 'priority' ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#343a40"
+                  />
+                </TouchableOpacity>
+
+                {activeDropdown === 'priority' && (
+                  <View style={[styles.dropdown, getPriorityDropdownPosition()]}>
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => selectPriority('High')}
+                    >
+                      <View style={styles.priorityItem}>
+                        <View style={[styles.priorityDot, { backgroundColor: '#e03131' }]} />
+                        <Text style={[
+                          styles.dropdownItemText,
+                          priority === 'High' && styles.activeDropdownItem
+                        ]}>
+                          High
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => selectPriority('Medium')}
+                    >
+                      <View style={styles.priorityItem}>
+                        <View style={[styles.priorityDot, { backgroundColor: '#f59f00' }]} />
+                        <Text style={[
+                          styles.dropdownItemText,
+                          priority === 'Medium' && styles.activeDropdownItem
+                        ]}>
+                          Medium
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => selectPriority('Low')}
+                    >
+                      <View style={styles.priorityItem}>
+                        <View style={[styles.priorityDot, { backgroundColor: '#40c057' }]} />
+                        <Text style={[
+                          styles.dropdownItemText,
+                          priority === 'Low' && styles.activeDropdownItem
+                        ]}>
+                          Low
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Add spacing to accommodate dropdown */}
+              {activeDropdown === 'priority' && <View style={styles.dropdownSpaceFiller} />}
+
+              <Text style={styles.inputLabel}>Due Date</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => {
+                  setActiveDropdown(null);
+                  setShowDatePicker(true);
+                }}
+              >
+                <Text style={styles.dateButtonText}>{formattedDate}</Text>
+                <Icon name="calendar" size={18} color="#343a40" />
+              </TouchableOpacity>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={dueDate}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  minimumDate={new Date()}
+                />
+              )}
+              
+              {/* Add extra space at the bottom to ensure everything is scrollable */}
+              <View style={{ height: 100 }} />
+            </ScrollView>
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={handleCancel}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.saveButton} 
+                onPress={handleSave}
+              >
+                <Text style={styles.saveButtonText}>Save Goal</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-// Now let's update the GoalsPage component to use our new AddGoalModal
+
 const GoalsPage = () => {
   const { userData, updateUserData, totalSaved } = useSavings();
   const [goalType, setGoalType] = useState('individual');
@@ -343,6 +390,10 @@ const GoalsPage = () => {
   const [transferAmount, setTransferAmount] = useState('');
   const [selectedGoalId, setSelectedGoalId] = useState(null);
   const [addGoalModalVisible, setAddGoalModalVisible] = useState(false);
+  
+  // New state for analysis modal
+  const [analysisModalVisible, setAnalysisModalVisible] = useState(false);
+  const [analysisGoalId, setAnalysisGoalId] = useState(null);
 
   // Calculate percentage for progress bars
   const calculatePercentage = (saved, target) => {
@@ -415,6 +466,16 @@ const GoalsPage = () => {
     goalType === 'individual' ? goal.isIndividual : !goal.isIndividual
   );
 
+  // Updated to prevent the card's onPress from triggering
+  const handleAnalyse = (goalId, event) => {
+    // Stop event propagation (if event is provided)
+    if (event) {
+      event.stopPropagation();
+    }
+    setAnalysisGoalId(goalId);
+    setAnalysisModalVisible(true);
+  };
+
   const renderGoalItem = ({ item }) => {
     const percentage = calculatePercentage(item.saved, item.target);
     const dueDate = new Date(item.dueDate);
@@ -423,7 +484,7 @@ const GoalsPage = () => {
       day: 'numeric',
       year: 'numeric',
     });
-
+  
     return (
       <TouchableOpacity 
         style={styles.goalCard}
@@ -442,7 +503,7 @@ const GoalsPage = () => {
             <Text style={styles.priorityText}>{item.priority}</Text>
           </View>
         </View>
-
+  
         <View style={styles.goalAmounts}>
           <Text style={styles.savedAmount}>₹{item.saved.toLocaleString()}</Text>
           <Text style={styles.targetAmount}>of ₹{item.target.toLocaleString()}</Text>
@@ -464,7 +525,7 @@ const GoalsPage = () => {
           <Text style={styles.percentageText}>{Math.round(percentage)}% complete</Text>
           <Text style={styles.dueDate}>Due: {formattedDate}</Text>
         </View>
-
+  
         {!item.isIndividual && (
           <View style={styles.membersInfo}>
             <Icon name="users" size={16} color="#6c757d" />
@@ -472,7 +533,18 @@ const GoalsPage = () => {
           </View>
         )}
         
-        <Text style={styles.tapToAddText}>Tap to add money</Text>
+        <View style={styles.actionFooter}>
+          <TouchableOpacity 
+            style={styles.analyseButton}
+            onPress={(event) => handleAnalyse(item.id, event)}
+          >
+            <Text style={styles.analyseButtonText}>Analyse</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity>
+            <Text style={styles.tapToAddText}>Tap to add money</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -610,6 +682,13 @@ const GoalsPage = () => {
         visible={addGoalModalVisible}
         onClose={() => setAddGoalModalVisible(false)}
       />
+      
+      {/* Goal Analysis Modal */}
+      <GoalAnalysisModal 
+        visible={analysisModalVisible}
+        onClose={() => setAnalysisModalVisible(false)}
+        goalId={analysisGoalId}
+      />
     </SafeAreaView>
   );
 };
@@ -652,7 +731,7 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: {
     position: 'relative',
-    zIndex: 1,
+    zIndex: 999, // High z-index for main screen dropdown
   },
   dropdownButton: {
     flexDirection: 'row',
@@ -679,8 +758,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#dee2e6',
-    elevation: 4,
-    zIndex: 2,
+    elevation: 5,
+    zIndex: 1000, // Higher z-index than container
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   dropdownItem: {
     paddingHorizontal: 12,
@@ -801,8 +884,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4c6ef5',
     fontStyle: 'italic',
-    marginTop: 8,
-    textAlign: 'center',
   },
   // Modal styles for manual transfer
   modalContainer: {
@@ -825,6 +906,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    maxHeight: '90%',
   },
   modalTitle: {
     fontSize: 20,
@@ -868,7 +950,13 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     backgroundColor: '#e9ecef',
+    width: '48%',
+    height: 50,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+
   cancelButtonText: {
     color: '#495057',
     fontSize: 16,
@@ -948,7 +1036,36 @@ const styles = StyleSheet.create({
   priorityItem: {
     flexDirection: 'row',
     alignItems: 'center',
+  },tapToAddText: {
+    fontSize: 14,
+    color: '#4c6ef5',
+    fontStyle: 'italic',
+  },
+  
+  // New styles
+  actionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f5',
+  },
+  analyseButton: {
+    backgroundColor: '#e9ecef',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  analyseButtonText: {
+    color: '#495057',
+    fontWeight: '500',
+    fontSize: 14,
   },
 });
+
+
+
 
 export default GoalsPage;
